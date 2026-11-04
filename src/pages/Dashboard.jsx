@@ -38,8 +38,8 @@ const ROLES = [
   "Super User",
   "Admin",
   "Project Lead",
+  "Team Member",
 ];
-const ROLE_STORAGE_KEY = "connect-projects-role";
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", roles: ROLES },
@@ -86,7 +86,7 @@ function ProgressBar({ value, status }) {
   );
 }
 
-function Sidebar({ role, active, onNavigate }) {
+function Sidebar({ name, role, active, onNavigate }) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -109,9 +109,11 @@ function Sidebar({ role, active, onNavigate }) {
         </ul>
       </nav>
       <div className="sidebar__foot">
-        <div className="avatar" aria-hidden="true">RP</div>
+        <div className="avatar" aria-hidden="true">
+          {name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
+        </div>
         <div>
-          <p className="sidebar__user">Rajpal Pawar</p>
+          <p className="sidebar__user">{name}</p>
           <p className="sidebar__role">{role}</p>
         </div>
       </div>
@@ -120,18 +122,8 @@ function Sidebar({ role, active, onNavigate }) {
 }
 
 /* ---------- Page ---------- */
-export default function Dashboard() {
-  const [role, setRole] = useState(() => {
-    const savedRole = window.localStorage.getItem(ROLE_STORAGE_KEY);
-    const migratedRole = savedRole === "Team Member"
-      ? "Project Lead"
-      : savedRole === "Project Lead"
-      ? "Admin"
-      : savedRole === "Admin"
-        ? "Super User"
-        : savedRole;
-    return ROLES.includes(migratedRole) ? migratedRole : "Admin";
-  });
+export default function Dashboard({ user, onLogout }) {
+  const role = ROLES.includes(user.role) ? user.role : "Admin";
   const [active, setActive] = useState("dashboard");
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
@@ -160,7 +152,7 @@ export default function Dashboard() {
 
   return (
     <div className="shell">
-      <Sidebar role={role} active={active} onNavigate={setActive} />
+      <Sidebar name={user.name} role={role} active={active} onNavigate={setActive} />
 
       <div className="main">
         <header className="topbar">
@@ -169,6 +161,7 @@ export default function Dashboard() {
             <p className="topbar__sub">Wednesday, 4 November 2026</p>
           </div>
           <div className="topbar__tools">
+            <span className="topbar__user">{user.name}</span>
             <label className="search">
               <span className="sr-only">Search projects</span>
               <input
@@ -178,22 +171,8 @@ export default function Dashboard() {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </label>
-            <label className="role-switch">
-              <span>Viewing as</span>
-              <select
-                value={role}
-                onChange={(e) => {
-                  const selectedRole = e.target.value;
-                  window.localStorage.setItem(ROLE_STORAGE_KEY, selectedRole);
-                  setRole(selectedRole);
-                }}
-              >
-                {ROLES.map((r) => (
-                  <option key={r}>{r}</option>
-                ))}
-              </select>
-            </label>
             <button className="btn btn--primary">New project</button>
+            <button className="btn" onClick={onLogout}>Sign out</button>
           </div>
         </header>
 

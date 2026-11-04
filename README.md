@@ -1,65 +1,37 @@
-# Connect Projects
+# Connect Projects - Frontend (Login + Dashboard)
 
-Combined React + Vite application: sign in first, then open the project dashboard.
-The dashboard data and sign-in accounts are demo data; no backend is connected.
+React + Vite frontend for the Connect Projects Platform.
 
-## Run locally
+## Run
+    npm install
+    npm run dev
 
-From the repository root:
+Open http://localhost:5173
 
-```sh
-npm install
-npm run dev
-```
+## Account requests
+- Applicants submit their name, requested username, and email from the sign-in page.
+- A Super User reviews enquiries under **Account requests**. Approving an enquiry creates a Project Lead account with a temporary password set by the Super User.
+- The Super User must share the temporary password with the applicant securely; email delivery is not configured.
+- Forgot password requests must be handled by the Super User.
 
-Open the local URL printed by Vite (normally http://localhost:5173).
+## Backend
+The frontend requires the Spring Boot and PostgreSQL service in `backend/`.
 
-## Demo sign-ins
+1. In PowerShell, copy the example settings: `Copy-Item .env.example .env`.
+2. Edit `.env` and replace every example password/secret with private values.
+3. From this folder, run `docker compose up --build` to start PostgreSQL and the API.
+4. In a second terminal, run `npm install` and `npm run dev`.
 
-| Role | Username | Password |
-| --- | --- | --- |
-| Admin | `admin` | `admin123` |
-| Project Lead | `lead` | `lead123` |
-| Team Member | `member` | `member123` |
+The backend bootstraps the first Super User from `BOOTSTRAP_SUPERUSER_USERNAME`, `BOOTSTRAP_SUPERUSER_PASSWORD`, and `BOOTSTRAP_SUPERUSER_NAME`. Passwords are BCrypt-hashed. For deployment, configure a managed PostgreSQL database, set all backend environment variables securely, and set `VITE_API_BASE_URL` to the backend's public origin. Do not use development secrets in production.
 
-Use **Sign out** in the dashboard to return to the login screen. The signed-in
-demo user is kept in session storage for the current browser tab.
+## Deploy the frontend to Netlify
+The repository includes `netlify.toml` for the Vite build and single-page-app routing. Deploy the frontend from the repository root with `npm run build` and `dist` as the publish directory. Deploy the Spring Boot API and PostgreSQL separately, then set `VITE_API_BASE_URL` in Netlify to the public API origin and redeploy. The frontend cannot process account requests unless that API is reachable.
 
-## Deploy the combined app to Netlify
+## Structure
+- src/App.jsx                 shows Login until a user is signed in, then the Dashboard
+- src/auth/authService.js     API login, account enquiries, approvals, and logout
+- src/pages/Login.jsx / .css  login page
+- src/pages/Dashboard.jsx / .css  dashboard (menu and panels change by role)
+- backend/                    Spring Boot API and PostgreSQL migration
 
-The GitHub repository `manekunal2020/connect-projects-dashboard` is the
-combined app repository. Its root contains the Vite app, so Netlify should
-build from the repository root.
-
-1. Push the latest `main` branch to
-   https://github.com/manekunal2020/connect-projects-dashboard.
-2. Sign in to Netlify and choose **Add new site** → **Import an existing project**.
-3. Choose GitHub, authorize Netlify if asked, and select
-   `manekunal2020/connect-projects-dashboard`.
-4. Configure the site:
-   - **Base directory:** leave blank (repository root)
-   - **Build command:** `npm run build`
-   - **Publish directory:** `dist`
-   - **Environment variables:** none required for this demo
-5. Choose **Deploy site**. Netlify installs dependencies and publishes the
-   generated `dist` directory.
-6. Open the Netlify site URL and sign in with one of the demo accounts above.
-   Later pushes to `main` trigger a new deploy automatically.
-
-The checked-in `netlify.toml` already defines the build command, publish
-directory, and single-page-app fallback so direct page refreshes work.
-
-## Important: demo authentication
-
-The demo usernames/passwords are included in browser-delivered JavaScript.
-This login is for demonstration only; it is not secure authentication and
-must not be used to protect real data. Before production use, connect a
-backend authentication API, enforce authorization on that backend, and remove
-the demo accounts from the login screen.
-
-## Project layout
-
-- `src/auth/authService.js` — demo sign-in and session storage
-- `src/pages/Login.jsx` — login page
-- `src/pages/Dashboard.jsx` — dashboard and mock project data
-- `netlify.toml` — Netlify build and SPA routing configuration
+The dashboard project/task data remains mock data in `src/pages/Dashboard.jsx`.

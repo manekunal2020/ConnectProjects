@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { approveAccountRequest, getAccountRequests, rejectAccountRequest } from "../auth/authService.js";
 import "./Dashboard.css";
 
 /* ---------- Mock data (replace with API calls, e.g. GET /api/dashboard) ---------- */
@@ -34,21 +35,14 @@ const WORKLOAD = [
   { name: "Meera", open: 4 },
 ];
 
-const ROLES = [
-  "Super User",
-  "Admin",
-  "Project Lead",
-  "Team Member",
-];
+const ROLES = ["Super User", "Admin", "Project Lead"];
 
 const NAV = [
   { key: "dashboard", label: "Dashboard", roles: ROLES },
   { key: "projects", label: "Projects", roles: ROLES },
   { key: "tasks", label: "My tasks", roles: ROLES },
-  { key: "reports", label: "Reports & analytics", roles: ["Super User", "Admin", "Reports & Analytics"] },
-  { key: "Management", label: "Project Management", roles: ["Super User", "Admin", "Project Management"] },
-  { key: "Client", label: "Client Management", roles: ["Super User", "Admin", "Client Management"] },
-  { key: "users", label: "User management", roles: ["Super User"] },
+  { key: "reports", label: "Reports & analytics", roles: ["Super User", "Admin"] },
+  { key: "users", label: "Account requests", roles: ["Super User"] },
   { key: "settings", label: "Settings", roles: ROLES },
 ];
 
@@ -60,6 +54,99 @@ const fmtDate = (iso) =>
 const daysLeft = (iso) => Math.ceil((new Date(iso) - TODAY) / 86400000);
 
 const statusClass = (s) => "tag tag--" + s.toLowerCase().replace(/\s+/g, "-");
+
+function AccountRequests({ user }) {
+  const [requests, setRequests] = useState([]);
+  const [passwords, setPasswords] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  async function refreshRequests() {
+    setError("");
+    try {
+      setRequests(await getAccountRequests(user.token));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not load account enquiries.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshRequests();
+  }, [user.token]);
+
+  async function reviewRequest(request, approve) {
+    setError("");
+    setNotice("");
+    try {
+      if (approve) {
+        const password = passwords[request.id] ?? "";
+        if (password.length < 12 || password.length > 72) {
+          throw new Error("Set a temporary password between 12 and 72 characters.");
+        }
+        await approveAccountRequest(user.token, request.id, password);
+        setPasswords((current) => ({ ...current, [request.id]: "" }));
+        setNotice(`Account created for ${request.name}. Share the temporary password with them securely.`);
+      } else {
+        await rejectAccountRequest(user.token, request.id);
+        setNotice(`Enquiry from ${request.name} was declined.`);
+      }
+      await refreshRequests();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not review this enquiry.");
+    }
+  }
+
+  return (
+    <section className="panel panel--wide">
+      <div className="panel__head">
+        <h2>Pending account enquiries</h2>
+        <button className="btn" onClick={refreshRequests} disabled={loading}>Refresh</button>
+      </div>
+      {error && <p className="account-request__message account-request__message--error" role="alert">{error}</p>}
+      {notice && <p className="account-request__message account-request__message--success" role="status">{notice}</p>}
+      {loading ? (
+        <p className="empty">Loading enquiries...</p>
+      ) : requests.length === 0 ? (
+        <p className="empty">There are no pending account enquiries.</p>
+      ) : (
+        <ul className="account-requests">
+          {requests.map((request) => (
+            <li className="account-request" key={request.id}>
+              <div className="account-request__details">
+                <h3>{request.name}</h3>
+                <p><strong>Username:</strong> {request.username}</p>
+                <p><strong>Email:</strong> {request.email}</p>
+                <p className="muted">Received {new Date(request.submittedAt).toLocaleString()}</p>
+              </div>
+              <div className="account-request__actions">
+                <label className="field">
+                  <span>Temporary password (12-72 characters)</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    maxLength={72}
+                    value={passwords[request.id] ?? ""}
+                    onChange={(event) => setPasswords((current) => ({ ...current, [request.id]: event.target.value }))}
+                  />
+                </label>
+                <div className="account-request__buttons">
+                  <button className="btn btn--primary" onClick={() => reviewRequest(request, true)}>Approve and create account</button>
+                  <button className="btn" onClick={() => reviewRequest(request, false)}>Decline</button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="account-request__note">
+        New accounts are created as Project Leads. The applicant is not emailed automatically; share the temporary password with them securely.
+      </p>
+    </section>
+  );
+}
 
 /* ---------- Small components ---------- */
 function Stat({ label, value, note, tone }) {
@@ -86,7 +173,9 @@ function ProgressBar({ value, status }) {
   );
 }
 
-function Sidebar({ name, role, active, onNavigate }) {
+function Sidebar({ user, active, onNavigate, onLogout }) {
+  const role = user.role;
+  const initials = user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -109,13 +198,12 @@ function Sidebar({ name, role, active, onNavigate }) {
         </ul>
       </nav>
       <div className="sidebar__foot">
-        <div className="avatar" aria-hidden="true">
-          {name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase()}
-        </div>
-        <div>
-          <p className="sidebar__user">{name}</p>
+        <div className="avatar" aria-hidden="true">{initials}</div>
+        <div className="sidebar__who">
+          <p className="sidebar__user">{user.name}</p>
           <p className="sidebar__role">{role}</p>
         </div>
+        <button className="sidebar__logout" onClick={onLogout}>Log out</button>
       </div>
     </aside>
   );
@@ -123,7 +211,7 @@ function Sidebar({ name, role, active, onNavigate }) {
 
 /* ---------- Page ---------- */
 export default function Dashboard({ user, onLogout }) {
-  const role = ROLES.includes(user.role) ? user.role : "Admin";
+  const role = user.role;
   const [active, setActive] = useState("dashboard");
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
@@ -152,36 +240,38 @@ export default function Dashboard({ user, onLogout }) {
 
   return (
     <div className="shell">
-      <Sidebar name={user.name} role={role} active={active} onNavigate={setActive} />
+      <Sidebar user={user} active={active} onNavigate={setActive} onLogout={onLogout} />
 
       <div className="main">
         <header className="topbar">
           <div>
-            <h1 className="topbar__title">Dashboard</h1>
+            <h1 className="topbar__title">{active === "users" ? "Account requests" : "Dashboard"}</h1>
             <p className="topbar__sub">Wednesday, 4 November 2026</p>
           </div>
-          <div className="topbar__tools">
-            <span className="topbar__user">{user.name}</span>
-            <label className="search">
-              <span className="sr-only">Search projects</span>
-              <input
-                type="search"
-                placeholder="Search projects"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
-            <button className="btn btn--primary">New project</button>
-            <button className="btn" onClick={onLogout}>Sign out</button>
-          </div>
+          {active !== "users" && (
+            <div className="topbar__tools">
+              <label className="search">
+                <span className="sr-only">Search projects</span>
+                <input
+                  type="search"
+                  placeholder="Search projects"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </label>
+              <button className="btn btn--primary">New project</button>
+            </div>
+          )}
         </header>
 
         <main className="content">
+          {active === "users" ? <AccountRequests user={user} /> : (
+            <>
           {/* Attention strip: the one memorable element */}
           {atRisk.length > 0 && role !== "Project Lead" && (
             <section className="attention" aria-label="Projects needing attention">
               <h2 className="attention__title">
-                {atRisk.length} Escalation
+                {atRisk.length} projects need attention
               </h2>
               <ul className="attention__list">
                 {atRisk.map((p) => (
@@ -327,6 +417,8 @@ export default function Dashboard({ user, onLogout }) {
               </ul>
             </section>
           </div>
+            </>
+          )}
         </main>
       </div>
     </div>

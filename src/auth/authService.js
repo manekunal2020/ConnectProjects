@@ -1,56 +1,83 @@
-const DEMO_USERS = [
-  { username: "admin", password: "admin123", name: "Ananya Kulkarni", role: "Admin" },
-  { username: "lead", password: "lead123", name: "Priya Nair", role: "Project Lead" },
-  { username: "member", password: "member123", name: "Meera Joshi", role: "Team Member" },
-];
+const SESSION_KEY = "cp_user";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-const STORAGE_KEY = "connect-projects-user";
-const VALID_ROLES = new Set(DEMO_USERS.map((user) => user.role));
-
-export const demoAccounts = DEMO_USERS.map(({ username, password, role }) => ({
-  username,
-  password,
-  role,
-}));
-
-export async function login(username, password) {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  const normalizedUsername = username.trim().toLowerCase();
-  const match = DEMO_USERS.find(
-    (user) => user.username === normalizedUsername && user.password === password,
-  );
-
-  if (!match) {
-    throw new Error("Incorrect username or password.");
+async function apiRequest(path, { token, ...options } = {}) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    throw new Error("Could not reach the account server. Check that the backend is running.");
   }
 
-  const user = { username: match.username, name: match.name, role: match.role };
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    if (response.ok) {
+      throw new Error("The account server returned an invalid response.");
+    }
+  }
+  if (!response.ok) {
+    const message = body?.message || (response.status >= 500
+      ? `The account server failed (HTTP ${response.status}). Ensure the Spring Boot API and PostgreSQL are running.`
+      : `The account server returned an error (${response.status}).`);
+    throw new Error(message);
+  }
+  return body;
+}
+
+export async function login(username, password) {
+  const result = await apiRequest("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username: username.trim(), password }),
+  });
+  const user = { ...result.user, token: result.token };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
   return user;
+}
+
+export function submitAccountRequest({ name, username, email }) {
+  return apiRequest("/api/account-requests", {
+    method: "POST",
+    body: JSON.stringify({ name: name.trim(), username: username.trim(), email: email.trim() }),
+  });
+}
+
+export function getAccountRequests(token) {
+  return apiRequest("/api/account-requests", { token });
+}
+
+export function approveAccountRequest(token, requestId, password) {
+  return apiRequest(`/api/account-requests/${requestId}/approve`, {
+    token,
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export function rejectAccountRequest(token, requestId) {
+  return apiRequest(`/api/account-requests/${requestId}/reject`, {
+    token,
+    method: "POST",
+  });
 }
 
 export function getStoredUser() {
   try {
-    const stored = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!stored) return null;
-
-    const user = JSON.parse(stored);
-    if (
-      typeof user?.username !== "string" ||
-      typeof user?.name !== "string" ||
-      !VALID_ROLES.has(user?.role)
-    ) {
-      logout();
-      return null;
-    }
-
-    return user;
+    const user = JSON.parse(sessionStorage.getItem(SESSION_KEY));
+    return typeof user?.token === "string" ? user : null;
   } catch {
-    logout();
     return null;
   }
 }
 
 export function logout() {
-  window.sessionStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
 }

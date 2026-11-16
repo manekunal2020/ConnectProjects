@@ -57,13 +57,15 @@ public class AccountRequestService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Temporary password cannot exceed 72 UTF-8 bytes.");
         }
 
-        AppUser newUser = users.save(new AppUser(
+        AppUser newUser = new AppUser(
                 request.getUsername(),
                 request.getEmail(),
                 request.getFullName(),
                 passwordEncoder.encode(approval.password()),
                 UserRole.PROJECT_LEAD
-        ));
+        );
+        newUser.setPermissions(PermissionCatalog.defaults(UserRole.PROJECT_LEAD));
+        users.save(newUser);
         request.review(RequestStatus.APPROVED, reviewer);
         return UserResponse.from(newUser);
     }

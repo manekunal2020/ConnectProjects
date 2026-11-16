@@ -7,8 +7,15 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 @Entity
 @Table(name = "app_users")
 public class AppUser {
@@ -34,6 +41,17 @@ public class AppUser {
 
     @Column(nullable = false)
     private boolean enabled = true;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "app_user_permissions", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "permission", nullable = false, length = 80)
+    private List<String> permissions = new ArrayList<>();
+
+    @Column(name = "reset_token_hash", length = 64)
+    private String resetTokenHash;
+
+    @Column(name = "reset_token_expires")
+    private Instant resetTokenExpires;
 
     protected AppUser() {
     }
@@ -73,5 +91,48 @@ public class AppUser {
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public List<String> getPermissions() {
+        return permissions;
+    }
+
+    public void setPermissions(List<String> permissions) {
+        this.permissions.clear();
+        this.permissions.addAll(permissions);
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public String getResetTokenHash() {
+        return resetTokenHash;
+    }
+
+    public Instant getResetTokenExpires() {
+        return resetTokenExpires;
+    }
+
+    public void setPasswordReset(String tokenHash, Instant expiresAt) {
+        this.resetTokenHash = tokenHash;
+        this.resetTokenExpires = expiresAt;
+    }
+
+    public void clearPasswordReset() {
+        this.resetTokenHash = null;
+        this.resetTokenExpires = null;
     }
 }

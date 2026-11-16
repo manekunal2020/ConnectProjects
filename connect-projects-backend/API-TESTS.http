@@ -1,0 +1,16 @@
+### Health
+GET http://localhost:5000/api/health
+
+### Login (copy token from response)
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{"username":"admin","password":"admin123"}
+
+### Dashboard (replace TOKEN)
+GET http://localhost:5000/api/dashboard
+Authorization: Bearer TOKEN
+
+### Projects
+GET http://localhost:5000/api/projects
+Authorization: Bearer TOKEN

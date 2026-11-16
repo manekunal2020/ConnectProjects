@@ -71,7 +71,7 @@ public class SecurityConfig {
     ) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.stream(origins.split(",")).map(String::trim).toList());
-        configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setMaxAge(3600L);
 
@@ -93,7 +93,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(provider)
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/account-requests").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/account-requests").permitAll()
                         .requestMatchers("/api/account-requests/**").hasRole(UserRole.SUPER_USER.name())
                         .anyRequest().authenticated()
                 )
@@ -108,7 +108,7 @@ public class SecurityConfig {
                             response.setStatus(HttpStatus.FORBIDDEN.value());
                             response.setContentType("application/json");
                             objectMapper.writeValue(response.getOutputStream(),
-                                    new ErrorResponse("Only the Super User can review account enquiries."));
+                                    new ErrorResponse("You do not have permission to perform this action."));
                         })
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

@@ -3,5 +3,6 @@ package com.connectprojects.backend.account;
 public enum UserRole {
     SUPER_USER,
     ADMIN,
-    PROJECT_LEAD
+    PROJECT_LEAD,
+    TEAM_MEMBER
 }
